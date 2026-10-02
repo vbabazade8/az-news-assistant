@@ -1,6 +1,8 @@
+import csv
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,7 +16,8 @@ HEADERS = {
 }
 BAKU_TZ = timezone(timedelta(hours=4))
 HOURS_BACK = 24
-MAX_PAGES = 100  # safety limit, so the loop can never run forever
+MAX_PAGES = 100  
+OUTPUT_FILE = Path("data/report_az.csv")
 
 
 def fetch_html(url, params=None):
@@ -51,6 +54,31 @@ def parse_cards(html):
         })
 
     return news
+
+
+def fetch_article_text(url):
+    soup = BeautifulSoup(fetch_html(url), "html.parser")
+
+    desc = soup.find("div", class_="news-detail__desc")
+    if desc is None:
+        return ""
+
+    paragraphs = []
+    for p in desc.find_all("p"):
+        text = p.get_text(" ", strip=True)
+        if text:
+            paragraphs.append(text)
+
+    return "\n".join(paragraphs)
+
+
+def save_csv(news, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.DictWriter(file, fieldnames=list(news[0].keys()))
+        writer.writeheader()
+        writer.writerows(news)
+    print(f"saved {len(news)} news to {path}")
 
 
 cutoff = datetime.now(BAKU_TZ) - timedelta(hours=HOURS_BACK)
@@ -94,5 +122,19 @@ for page in range(1, MAX_PAGES + 1):
     ))
 
 print("total news:", len(all_news))
-print("newest:", all_news[0]["timestamp"], "-", all_news[0]["title"])
-print("oldest:", all_news[-1]["timestamp"], "-", all_news[-1]["title"])
+
+for i, item in enumerate(all_news, start=1):
+    try:
+        item["content"] = fetch_article_text(item["url"])
+    except requests.RequestException as error:
+        print(f"failed: {item['url']} ({error})")
+        item["content"] = ""
+
+    print(f"article {i}/{len(all_news)}: {len(item['content'])} chars - {item['title']}")
+    time.sleep(1)
+
+if all_news:
+    save_csv(all_news, OUTPUT_FILE)
+
+empty = sum(1 for item in all_news if not item["content"])
+print("articles without text:", empty)
