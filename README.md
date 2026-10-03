@@ -1,6 +1,8 @@
 # az-news-assistant
 
-Ask questions about today's Azerbaijani news. Scrapers collect fresh articles from several news sites, store them in a database, and Gemini answers questions using all news from the last 24 hours (CAG — cache-augmented generation).
+Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is delivered to Telegram and shown on a website.
+
+**Why:** CEOs and analysts don't have time to follow news sites, but they need to know what happened in their industry.
 
 ## Status
 
@@ -8,39 +10,46 @@ Ask questions about today's Azerbaijani news. Scrapers collect fresh articles fr
 |---|---|
 | Scrapers for report.az, apa.az, axar.az | ✅ done |
 | Neon (PostgreSQL) database | ⏳ next |
-| Gemini API (CAG) | ⏳ planned |
-| FastAPI backend | ⏳ planned |
-| Frontend | ⏳ planned |
-| GitHub Actions (automatic scraping) | ⏳ planned |
+| Digest job (Gemini API) | ⏳ planned |
+| Telegram bot | ⏳ planned |
+| Website | ⏳ planned |
+| GitHub Actions (automatic runs) | ⏳ planned |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph collect["News collection — automatic, 3 times a day"]
+    subgraph collect["1. Collect — automatic, several times a day"]
         sites["News sites<br/>report.az · apa.az · axar.az"] -->|HTML pages| scrapers["Scrapers<br/>report · apa · axar"]
     end
 
     scrapers -->|save news| db[("Neon<br/>PostgreSQL")]
 
-    subgraph answer["Answering a question — every time a user asks"]
-        user((User)) -->|1. question| front[Frontend]
-        front -->|2. question| api[FastAPI]
-        api -->|3. get news from the last 24h| db
-        db -.->|4. news| api
-        api -->|5. news + question| gemini[Gemini API]
-        gemini -.->|6. answer| api
-        api -.->|7. answer| front
-        front -.->|8. answer| user
+    subgraph summarize["2. Summarize — automatic, once a day"]
+        job["Digest job"] -->|"news from the last 24h<br/>+ analyst prompt"| gemini["Gemini API"]
+        gemini -.->|"summary +<br/>actionable insights"| job
     end
+
+    db -->|news from the last 24h| job
+    job -->|save digest| db
+
+    subgraph deliver["3. Deliver"]
+        tg["Telegram bot"]
+        web["Website"]
+    end
+
+    job -->|send digest| tg
+    db -->|latest digests| web
+    tg --> reader(("CEO / analyst"))
+    web --> reader
 
     classDef done fill:#d9f5e3,stroke:#16a34a,color:#111
     classDef planned fill:#f3f4f6,stroke:#9ca3af,color:#555,stroke-dasharray:5 5
     class sites,scrapers done
-    class db,user,front,api,gemini planned
+    class db,job,gemini,tg,web,reader planned
 ```
 
-Solid arrow — request, dashed arrow — response. Green — done, gray — planned.
+Green — done, gray — planned.
 
 ## News sources
 
