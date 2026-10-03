@@ -15,11 +15,6 @@ Ask questions about today's Azerbaijani news. Scrapers collect fresh articles fr
 
 ## Architecture
 
-![Architecture](docs/images/architecture.png)
-
-<details>
-<summary>Same diagram in Mermaid</summary>
-
 ```mermaid
 flowchart LR
     subgraph collect["News collection — automatic, 3 times a day"]
@@ -47,8 +42,6 @@ flowchart LR
 
 Solid arrow — request, dashed arrow — response. Green — done, gray — planned.
 
-</details>
-
 ## News sources
 
 | Site | News in 24h | How pages are loaded | Where the date comes from |
@@ -75,9 +68,6 @@ az-news-assistant/
 │       ├── report_scraper.py  # report.az
 │       ├── apa_scraper.py     # apa.az
 │       └── axar_scraper.py    # axar.az
-├── docs/
-│   └── images/
-│       └── architecture.png
 ├── requirements.txt
 └── README.md
 ```
