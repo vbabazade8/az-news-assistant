@@ -1,30 +1,18 @@
-import csv
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
+from scraper_job.config import BAKU_TZ, HOURS_BACK, MAX_PAGES
+from scraper_job.utils.helpers import fetch_html, save_csv
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 BASE_URL = "https://report.az"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"
-}
-BAKU_TZ = timezone(timedelta(hours=4))
-HOURS_BACK = 24
-MAX_PAGES = 100  
 OUTPUT_FILE = Path("data/report_az.csv")
-
-
-def fetch_html(url, params=None):
-    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
-    response.raise_for_status()
-    response.encoding = "utf-8"
-    return response.text
 
 
 def parse_timestamp(text):
@@ -70,15 +58,6 @@ def fetch_article_text(url):
             paragraphs.append(text)
 
     return "\n".join(paragraphs)
-
-
-def save_csv(news, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8-sig") as file:
-        writer = csv.DictWriter(file, fieldnames=list(news[0].keys()))
-        writer.writeheader()
-        writer.writerows(news)
-    print(f"saved {len(news)} news to {path}")
 
 
 cutoff = datetime.now(BAKU_TZ) - timedelta(hours=HOURS_BACK)
