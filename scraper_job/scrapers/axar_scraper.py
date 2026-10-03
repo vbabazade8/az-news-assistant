@@ -1,0 +1,183 @@
+import json
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import requests
+from bs4 import BeautifulSoup
+
+from scraper_job.config import BAKU_TZ, HOURS_BACK, MAX_PAGES
+from scraper_job.utils.helpers import fetch_html, save_csv
+
+sys.stdout.reconfigure(encoding="utf-8")
+
+BASE_URL = "https://axar.az"
+OUTPUT_FILE = Path("data/axar_az.csv")
+
+MONTHS = {
+    "yanvar": 1,
+    "fevral": 2,
+    "mart": 3,
+    "aprel": 4,
+    "may": 5,
+    "iyun": 6,
+    "iyul": 7,
+    "avqust": 8,
+    "sentyabr": 9,
+    "oktyabr": 10,
+    "noyabr": 11,
+    "dekabr": 12,
+}
+
+
+def page_url(page):
+    if page == 1:
+        return BASE_URL + "/latest/"
+    return f"{BASE_URL}/latest/page{page}/"
+
+
+def guess_datetime(date_text):
+    """Turn the short date from the news list into a datetime.
+
+    The list shows "18:49" for today's news and "2 Oktyabr 16:08" for older ones.
+    This is only used to decide when to stop; the exact date comes from the article page.
+    """
+    now = datetime.now(BAKU_TZ)
+    parts = date_text.split()
+
+    # "18:49" -> only time, so the news is from today
+    if len(parts) == 1:
+        hour, minute = parts[0].split(":")
+        result = now.replace(hour=int(hour), minute=int(minute), second=0, microsecond=0)
+        # Just after midnight, "23:50" is from yesterday, not from the future
+        if result > now:
+            result = result - timedelta(days=1)
+        return result
+
+    # "2 Oktyabr 16:08" -> day, month and time, but no year
+    day, month_name, time_text = parts
+    hour, minute = time_text.split(":")
+    month = MONTHS[month_name.lower()]
+    result = datetime(now.year, month, int(day), int(hour), int(minute), tzinfo=BAKU_TZ)
+
+    # On 1 January, "31 Dekabr" is from last year, not from the future
+    if result > now:
+        result = result.replace(year=now.year - 1)
+
+    return result
+
+
+def parse_cards(html):
+    soup = BeautifulSoup(html, "html.parser")
+    news = []
+
+    for card in soup.find_all("table", id="catNews"):
+        link = card.find("div", id="cat_news_title").find("a")
+        info = card.find_all("div", id="cat_news_info")
+        date_text = info[0].get_text(strip=True).replace("Tarix:", "").strip()
+
+        news.append({
+            "title": link.get_text(" ", strip=True),
+            "url": link["href"],
+            "category": None,
+            "published_at": guess_datetime(date_text),
+        })
+
+    return news
+
+
+def find_news_json_ld(soup):
+    """Find the JSON-LD block with "@type": "NewsArticle" and return it as a dict."""
+    for script in soup.find_all("script", type="application/ld+json"):
+        if not script.string:
+            continue
+        data = json.loads(script.string)
+        if data.get("@type") == "NewsArticle":
+            return data
+    return {}
+
+
+def fetch_article(url):
+    soup = BeautifulSoup(fetch_html(url), "html.parser")
+
+    # Text
+    paragraphs = []
+    body = soup.find("span", class_="article_body")
+    if body is not None:
+        for p in body.find_all("p"):
+            text = p.get_text(" ", strip=True)
+            if text:
+                paragraphs.append(text)
+
+    # Exact date and category from JSON-LD
+    data = find_news_json_ld(soup)
+    published_at = None
+    if "datePublished" in data:
+        published_at = datetime.fromisoformat(data["datePublished"])
+
+    return {
+        "content": "\n".join(paragraphs),
+        "published_at": published_at,
+        "category": data.get("articleSection"),
+    }
+
+
+# --- 1. Collect the list of news for the last 24 hours ---
+cutoff = datetime.now(BAKU_TZ) - timedelta(hours=HOURS_BACK)
+print("collecting news newer than:", cutoff.strftime("%Y-%m-%d %H:%M:%S"))
+
+all_news = []
+seen_urls = set()
+
+for page in range(1, MAX_PAGES + 1):
+    page_news = parse_cards(fetch_html(page_url(page)))
+
+    new_count = 0
+    for item in page_news:
+        if item["published_at"] < cutoff:
+            continue
+        if item["url"] not in seen_urls:
+            seen_urls.add(item["url"])
+            all_news.append(item)
+            new_count += 1
+
+    print(f"page {page}: got {len(page_news)}, new {new_count}, total {len(all_news)}")
+
+    if not page_news:
+        print("empty page - stop")
+        break
+
+    if page_news[-1]["published_at"] < cutoff:
+        print(f"reached news older than {HOURS_BACK} hours - stop")
+        break
+
+    if page == MAX_PAGES:
+        print("reached MAX_PAGES safety limit - stop")
+        break
+
+    time.sleep(1)
+
+print("total news:", len(all_news))
+
+# --- 2. Open each article: text, exact date, category ---
+for i, item in enumerate(all_news, start=1):
+    try:
+        article = fetch_article(item["url"])
+        item["content"] = article["content"]
+        item["category"] = article["category"]
+        if article["published_at"] is not None:
+            item["published_at"] = article["published_at"]
+    except requests.RequestException as error:
+        print(f"failed: {item['url']} ({error})")
+        item["content"] = ""
+
+    print(f"article {i}/{len(all_news)}: {len(item['content'])} chars - {item['published_at']} - {item['title']}")
+    time.sleep(1)
+
+# --- 3. Save to CSV ---
+if all_news:
+    save_csv(all_news, OUTPUT_FILE)
+
+empty = sum(1 for item in all_news if not item["content"])
+print("articles without text:", empty)
