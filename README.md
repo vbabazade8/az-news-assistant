@@ -1,6 +1,6 @@
 # az-news-assistant
 
-Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is delivered to Telegram and shown on a website.
+Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is shown on a website.
 
 **Why:** CEOs and analysts don't have time to follow news sites, but they need to know what happened in their industry.
 
@@ -11,7 +11,6 @@ Daily AI news digests for busy executives. Scrapers collect fresh articles from 
 | Scrapers for report.az, apa.az, axar.az | ✅ done |
 | Neon (PostgreSQL) database | ⏳ next |
 | Digest job (Gemini API) | ⏳ planned |
-| Telegram bot | ⏳ planned |
 | Website | ⏳ planned |
 | GitHub Actions (automatic runs) | ⏳ planned |
 
@@ -33,20 +32,13 @@ flowchart LR
     db -->|news from the last 24h| job
     job -->|save digest| db
 
-    subgraph deliver["3. Deliver"]
-        tg["Telegram bot"]
-        web["Website"]
-    end
-
-    job -->|send digest| tg
-    db -->|latest digests| web
-    tg --> reader(("CEO / analyst"))
-    web --> reader
+    db -->|latest digests| web["Website"]
+    web --> reader(("CEO / analyst"))
 
     classDef done fill:#d9f5e3,stroke:#16a34a,color:#111
     classDef planned fill:#f3f4f6,stroke:#9ca3af,color:#555,stroke-dasharray:5 5
     class sites,scrapers done
-    class db,job,gemini,tg,web,reader planned
+    class db,job,gemini,web,reader planned
 ```
 
 Green — done, gray — planned.
