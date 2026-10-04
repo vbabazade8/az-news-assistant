@@ -3,6 +3,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from scraper_job.utils.database import save_news
 
 import requests
 from bs4 import BeautifulSoup
@@ -181,3 +182,8 @@ if all_news:
 
 empty = sum(1 for item in all_news if not item["content"])
 print("articles without text:", empty)
+
+# --- 3. Save to CSV and to the database ---
+if all_news:
+    save_csv(all_news, OUTPUT_FILE)
+    save_news(all_news, "axar.az")

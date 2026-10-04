@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from scraper_job.config import BAKU_TZ, HOURS_BACK, MAX_PAGES
+from scraper_job.utils.database import save_news
 from scraper_job.utils.helpers import fetch_html, save_csv
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -122,9 +123,10 @@ for i, item in enumerate(all_news, start=1):
     print(f"article {i}/{len(all_news)}: {len(item['content'])} chars - {item['title']}")
     time.sleep(1)
 
-# --- 3. Save to CSV ---
+# --- 3. Save to CSV and to the database ---
 if all_news:
     save_csv(all_news, OUTPUT_FILE)
+    save_news(all_news, "apa.az")
 
 empty = sum(1 for item in all_news if not item["content"])
 print("articles without text:", empty)

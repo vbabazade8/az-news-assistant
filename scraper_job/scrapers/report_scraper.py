@@ -2,11 +2,10 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-
 import requests
 from bs4 import BeautifulSoup
-
 from scraper_job.config import BAKU_TZ, HOURS_BACK, MAX_PAGES
+from scraper_job.utils.database import save_news
 from scraper_job.utils.helpers import fetch_html, save_csv
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -39,6 +38,7 @@ def parse_cards(html):
             "date": date_items[0].get_text(strip=True),
             "time": date_items[1].get_text(strip=True),
             "timestamp": block["data-timestamp"],
+            "published_at": parse_timestamp(block["data-timestamp"]),
         })
 
     return news
@@ -71,7 +71,7 @@ page_news = parse_cards(fetch_html(BASE_URL + "/son-xeberler"))
 for page in range(1, MAX_PAGES + 1):
     new_count = 0
     for item in page_news:
-        if parse_timestamp(item["timestamp"]) < cutoff:
+        if item["published_at"] < cutoff:
             continue
         if item["url"] not in seen_urls:
             seen_urls.add(item["url"])
@@ -84,8 +84,7 @@ for page in range(1, MAX_PAGES + 1):
         print("empty page - stop")
         break
 
-    oldest_on_page = parse_timestamp(page_news[-1]["timestamp"])
-    if oldest_on_page < cutoff:
+    if page_news[-1]["published_at"] < cutoff:
         print(f"reached news older than {HOURS_BACK} hours - stop")
         break
 
@@ -114,6 +113,7 @@ for i, item in enumerate(all_news, start=1):
 
 if all_news:
     save_csv(all_news, OUTPUT_FILE)
+    save_news(all_news, "report.az")
 
 empty = sum(1 for item in all_news if not item["content"])
 print("articles without text:", empty)
