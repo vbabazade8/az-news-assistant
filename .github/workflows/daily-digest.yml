@@ -2,7 +2,9 @@ name: Daily digest
 
 on:
   schedule:
-    - cron: "17 4 * * *"   # every day at 04:17 UTC = 08:17 in Baku
+    # 03:13 UTC = 07:13 in Baku. The job takes ~15 minutes, so the digest
+    # is ready by ~07:30 — in time to read it at breakfast or on the way to work.
+    - cron: "13 3 * * *"
   workflow_dispatch:        # adds a "Run workflow" button for manual runs
 
 jobs:
