@@ -1,0 +1,44 @@
+name: Daily digest
+
+on:
+  schedule:
+    # 03:13 UTC = 07:13 in Baku. The job takes ~15 minutes, so the digest
+    # is ready by ~07:30 — in time to read it at breakfast or on the way to work.
+    - cron: "13 3 * * *"
+  workflow_dispatch:        # adds a "Run workflow" button for manual runs
+
+jobs:
+  scrape-and-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Scrape all news sites
+        run: python -m scraper_job.run_scrapers
+
+      - name: Make the digest with Gemini
+        run: python -m digest_job.run_digest
+
+      - name: Save the raw Gemini answer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-answer
+          path: data/last_gemini_answer.json
+          if-no-files-found: ignore

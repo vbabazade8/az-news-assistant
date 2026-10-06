@@ -75,58 +75,63 @@ def fetch_article_text(url):
     return "\n".join(paragraphs)
 
 
-# --- 1. Collect the list of news for the last 24 hours ---
-cutoff = datetime.now(BAKU_TZ) - timedelta(hours=HOURS_BACK)
-print("collecting news newer than:", cutoff.strftime("%Y-%m-%d %H:%M:%S"))
+def run():
+    # --- 1. Collect the list of news for the last 24 hours ---
+    cutoff = datetime.now(BAKU_TZ) - timedelta(hours=HOURS_BACK)
+    print("collecting news newer than:", cutoff.strftime("%Y-%m-%d %H:%M:%S"))
 
-all_news = []
-seen_urls = set()
+    all_news = []
+    seen_urls = set()
 
-for page in range(1, MAX_PAGES + 1):
-    page_news = parse_cards(fetch_html(BASE_URL + "/all-news", params={"page": page}))
+    for page in range(1, MAX_PAGES + 1):
+        page_news = parse_cards(fetch_html(BASE_URL + "/all-news", params={"page": page}))
 
-    new_count = 0
-    for item in page_news:
-        if item["published_at"] < cutoff:
-            continue
-        if item["url"] not in seen_urls:
-            seen_urls.add(item["url"])
-            all_news.append(item)
-            new_count += 1
+        new_count = 0
+        for item in page_news:
+            if item["published_at"] < cutoff:
+                continue
+            if item["url"] not in seen_urls:
+                seen_urls.add(item["url"])
+                all_news.append(item)
+                new_count += 1
 
-    print(f"page {page}: got {len(page_news)}, new {new_count}, total {len(all_news)}")
+        print(f"page {page}: got {len(page_news)}, new {new_count}, total {len(all_news)}")
 
-    if not page_news:
-        print("empty page - stop")
-        break
+        if not page_news:
+            print("empty page - stop")
+            break
 
-    if page_news[-1]["published_at"] < cutoff:
-        print(f"reached news older than {HOURS_BACK} hours - stop")
-        break
+        if page_news[-1]["published_at"] < cutoff:
+            print(f"reached news older than {HOURS_BACK} hours - stop")
+            break
 
-    if page == MAX_PAGES:
-        print("reached MAX_PAGES safety limit - stop")
-        break
+        if page == MAX_PAGES:
+            print("reached MAX_PAGES safety limit - stop")
+            break
 
-    time.sleep(1)
+        time.sleep(1)
 
-print("total news:", len(all_news))
+    print("total news:", len(all_news))
 
-# --- 2. Open each article and get its text ---
-for i, item in enumerate(all_news, start=1):
-    try:
-        item["content"] = fetch_article_text(item["url"])
-    except requests.RequestException as error:
-        print(f"failed: {item['url']} ({error})")
-        item["content"] = ""
+    # --- 2. Open each article and get its text ---
+    for i, item in enumerate(all_news, start=1):
+        try:
+            item["content"] = fetch_article_text(item["url"])
+        except requests.RequestException as error:
+            print(f"failed: {item['url']} ({error})")
+            item["content"] = ""
 
-    print(f"article {i}/{len(all_news)}: {len(item['content'])} chars - {item['title']}")
-    time.sleep(1)
+        print(f"article {i}/{len(all_news)}: {len(item['content'])} chars - {item['title']}")
+        time.sleep(1)
 
-# --- 3. Save to CSV and to the database ---
-if all_news:
-    save_csv(all_news, OUTPUT_FILE)
-    save_news(all_news, "apa.az")
+    # --- 3. Save to CSV and to the database ---
+    if all_news:
+        save_csv(all_news, OUTPUT_FILE)
+        save_news(all_news, "apa.az")
 
-empty = sum(1 for item in all_news if not item["content"])
-print("articles without text:", empty)
+    empty = sum(1 for item in all_news if not item["content"])
+    print("articles without text:", empty)
+
+
+if __name__ == "__main__":
+    run()

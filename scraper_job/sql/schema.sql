@@ -10,15 +10,28 @@ CREATE TABLE IF NOT EXISTS news (
     scraped_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()   -- when we saved it, set by the database
 );
 
+-- Every call to the LLM: what we asked and what it answered
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id           SERIAL PRIMARY KEY,
+    task         TEXT NOT NULL,                       -- what the call was for, for example 'digest'
+    industry     TEXT,                                -- for example 'investment'
+    model        TEXT NOT NULL,                       -- which Gemini model was used
+    prompt       TEXT NOT NULL,                       -- the full prompt we sent
+    response     TEXT,                                -- the raw answer from the model
+    news_count   INTEGER,                             -- how many news were in the prompt
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
+-- Table for AI-generated digests: one row = one digest for one day, one industry, one language
 CREATE TABLE IF NOT EXISTS digests (
     id           SERIAL PRIMARY KEY,
-    digest_date  DATE NOT NULL,
-    industry     TEXT NOT NULL,
-    language     TEXT NOT NULL,
-    content      TEXT NOT NULL,
-    news_count   INTEGER,
-    model        TEXT,
+    digest_date  DATE NOT NULL,                       -- the day the digest is about
+    industry     TEXT NOT NULL,                       -- for example 'investment'
+    language     TEXT NOT NULL,                       -- 'en', 'az' or 'ru'
+    content      TEXT NOT NULL,                       -- the digest text with links to sources
+    news_count   INTEGER,                             -- how many news Gemini used
+    model        TEXT,                                -- which Gemini model wrote it
+    llm_call_id  INTEGER REFERENCES llm_calls(id),    -- the LLM call that produced this digest
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (digest_date, industry, language)
+    UNIQUE (digest_date, industry, language)          -- only one digest per day, industry and language
 );
