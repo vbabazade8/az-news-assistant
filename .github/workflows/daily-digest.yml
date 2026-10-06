@@ -27,17 +27,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Scrape report.az
-        run: python -m scraper_job.scrapers.report_scraper
-        continue-on-error: true
-
-      - name: Scrape apa.az
-        run: python -m scraper_job.scrapers.apa_scraper
-        continue-on-error: true
-
-      - name: Scrape axar.az
-        run: python -m scraper_job.scrapers.axar_scraper
-        continue-on-error: true
+      - name: Scrape all news sites
+        run: python -m scraper_job.run_scrapers
 
       - name: Make the digest with Gemini
         run: python -m digest_job.run_digest
