@@ -1,6 +1,6 @@
 # az-news-assistant
 
-Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is shown on a website.
+Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is available through an API and will be shown on a website.
 
 **Why:** CEOs and analysts don't have time to follow news sites, but they need to know what happened in their industry.
 
@@ -11,33 +11,38 @@ Daily AI news digests for busy executives. Scrapers collect fresh articles from 
 | Scrapers for report.az, apa.az, axar.az | ✅ done |
 | Neon (PostgreSQL) database | ✅ done |
 | Digest job (Gemini API), EN / AZ / RU | ✅ done |
-| Website | ⏳ next |
-| GitHub Actions (automatic runs) | ⏳ planned |
+| LLM call logging (prompt + response) | ✅ done |
+| GitHub Actions (automatic daily run) | ✅ done |
+| Digest API (FastAPI) | ✅ done |
+| Website page (Jinja), EN / AZ / RU switch | ⏳ next |
+| Deploy | ⏳ planned |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph collect["1. Collect — automatic, several times a day"]
-        sites["News sites<br/>report.az · apa.az · axar.az"] -->|HTML pages| scrapers["Scrapers<br/>report · apa · axar"]
+    subgraph daily["GitHub Actions — every day at 07:13 Baku time"]
+        direction LR
+        subgraph collect["1. Collect"]
+            sites["News sites<br/>report.az · apa.az · axar.az"] -->|HTML pages| scrapers["Scrapers<br/>report · apa · axar"]
+        end
+        subgraph summarize["2. Summarize"]
+            job["Digest job"] -->|"news from the last 24h<br/>+ analyst prompt"| gemini["Gemini API"]
+            gemini -.->|"digest in EN / AZ / RU<br/>(JSON)"| job
+        end
     end
 
     scrapers -->|save news| db[("Neon<br/>PostgreSQL")]
-
-    subgraph summarize["2. Summarize — automatic, once a day"]
-        job["Digest job"] -->|"news from the last 24h<br/>+ analyst prompt"| gemini["Gemini API"]
-        gemini -.->|"digest in EN / AZ / RU<br/>(JSON)"| job
-    end
-
     db -->|news from the last 24h| job
-    job -->|save digests| db
+    job -->|"save digests<br/>+ log the LLM call"| db
 
-    db -->|latest digests| web["Website"]
+    db -->|digests| api["FastAPI<br/>/digest · /dates"]
+    api --> web["Website"]
     web --> reader(("CEO / analyst"))
 
     classDef done fill:#d9f5e3,stroke:#16a34a,color:#111
     classDef planned fill:#f3f4f6,stroke:#9ca3af,color:#555,stroke-dasharray:5 5
-    class sites,scrapers,db,job,gemini done
+    class sites,scrapers,db,job,gemini,api done
     class web,reader planned
 ```
 
@@ -57,21 +62,50 @@ Each scraper:
 3. opens every article and extracts its full text
 4. saves the result to `data/<site>.csv` and to the `news` table in Neon
 
+`scraper_job/run_scrapers.py` runs all scrapers one after another. If one site fails, the others still run; the job fails only if every scraper failed. To add a new site, write its scraper and add one line to the `SCRAPERS` dictionary.
+
 ## Digest
 
 The digest job (`digest_job/run_digest.py`):
-1. loads news from the last 24 hours from Neon (~500 on a weekday)
+1. loads news from the last 24 hours from Neon (~300–500 on a weekday)
 2. builds a compact prompt: for each news only the source, time, title and the first paragraph (up to 300 characters). The full text of 500 news is ~180k tokens; the compact version is ~30k tokens
 3. asks Gemini to act as a senior investment fund analyst, select only business-relevant news and write a digest with **Top stories**, **Market signals**, **Risks to watch** and **Actionable insights**, citing news numbers
 4. gets the digest in English, Azerbaijani and Russian in **one request**, as JSON with a fixed schema (structured output), so the answer is always valid JSON
-5. replaces news numbers like `[12, 40]` in the digest with Markdown links to the original articles, so every fact can be checked
-6. saves one row per language to the `digests` table; running it again on the same day updates the rows instead of adding new ones
+5. saves the full prompt and the raw answer to the `llm_calls` table, before parsing, so even a broken answer can be debugged
+6. replaces news numbers like `[12, 40]` in the digest with Markdown links to the original articles, so every fact can be checked
+7. saves one row per language to the `digests` table, linked to its LLM call; running it again on the same day updates the rows instead of adding new ones
 
 If Gemini is overloaded (503) or rate-limited (429), the job waits 30 seconds and retries up to 3 times.
 
+## Automatic runs (GitHub Actions)
+
+`.github/workflows/daily-digest.yml` runs every day at 03:13 UTC (07:13 in Baku):
+1. installs dependencies
+2. runs all scrapers (`python -m scraper_job.run_scrapers`)
+3. makes the digest (`python -m digest_job.run_digest`)
+4. uploads the raw Gemini answer as a run artifact
+
+It can also be started manually with the **Run workflow** button. `DATABASE_URL` and `GEMINI_API_KEY` are stored in the repository secrets.
+
+Note: GitHub can start scheduled runs late (sometimes by hours) when its servers are busy.
+
+## API
+
+Built with FastAPI (`web/main.py`).
+
+| Request | Returns |
+|---|---|
+| `GET /digest?language=en` | the latest digest in `en`, `az` or `ru` (default `en`) |
+| `GET /digest?language=ru&digest_date=2026-10-07` | the digest for a specific date |
+| `GET /dates` | all dates that have digests, newest first |
+
+Errors: `400` for an unknown language, `404` if there is no digest.
+
+Interactive documentation is available at `/docs`.
+
 ## Database
 
-Two tables ([schema](scraper_job/sql/schema.sql)):
+Three tables ([schema](scraper_job/sql/schema.sql)):
 
 **`news`** — all scraped news from every source
 
@@ -86,6 +120,19 @@ Two tables ([schema](scraper_job/sql/schema.sql)):
 | `content` | `TEXT` | full article text (plain text, no HTML) |
 | `scraped_at` | `TIMESTAMPTZ` | when we saved it, set by the database |
 
+**`llm_calls`** — every call to the LLM: what we asked and what it answered
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `SERIAL` | primary key |
+| `task` | `TEXT` | what the call was for, for example `digest` (later also `chat`) |
+| `industry` | `TEXT` | for example `investment` |
+| `model` | `TEXT` | which Gemini model was used |
+| `prompt` | `TEXT` | the full prompt we sent |
+| `response` | `TEXT` | the raw answer from the model |
+| `news_count` | `INTEGER` | how many news were in the prompt |
+| `created_at` | `TIMESTAMPTZ` | when the call was made |
+
 **`digests`** — AI-generated digests, one row per day, industry and language
 
 | Column | Type | Notes |
@@ -97,6 +144,7 @@ Two tables ([schema](scraper_job/sql/schema.sql)):
 | `content` | `TEXT` | the digest in Markdown, with links to sources |
 | `news_count` | `INTEGER` | how many news Gemini used |
 | `model` | `TEXT` | which Gemini model wrote it |
+| `llm_call_id` | `INTEGER` | the LLM call that produced this digest (`llm_calls.id`) |
 | `created_at` | `TIMESTAMPTZ` | when it was generated |
 
 `(digest_date, industry, language)` is unique.
@@ -105,13 +153,17 @@ Two tables ([schema](scraper_job/sql/schema.sql)):
 
 ```
 az-news-assistant/
+├── .github/
+│   └── workflows/
+│       └── daily-digest.yml   # daily run: scrapers + digest
 ├── scraper_job/
 │   ├── config.py              # shared settings: headers, timezone, hours back, max pages
+│   ├── run_scrapers.py        # runs all scrapers one after another
 │   ├── sql/
-│   │   └── schema.sql         # creates the news and digests tables
+│   │   └── schema.sql         # creates the news, llm_calls and digests tables
 │   ├── utils/
 │   │   ├── helpers.py         # shared functions: fetch_html, save_csv
-│   │   └── database.py        # Neon: save_news, get_recent_news, save_digests
+│   │   └── database.py        # Neon: save_news, get_recent_news, save_llm_call, save_digests
 │   └── scrapers/
 │       ├── report_scraper.py  # report.az
 │       ├── apa_scraper.py     # apa.az
@@ -121,6 +173,8 @@ az-news-assistant/
 │   ├── prompt.py              # compact news block + analyst prompt
 │   ├── sources.py             # turns news numbers into links to the original articles
 │   └── run_digest.py          # loads news, asks Gemini, saves digests
+├── web/
+│   └── main.py                # FastAPI: /digest and /dates
 ├── requirements.txt
 └── README.md
 ```
@@ -149,9 +203,14 @@ GEMINI_API_KEY=your-gemini-api-key
 5. Collect news and make a digest:
 
 ```bash
-python -m scraper_job.scrapers.report_scraper
-python -m scraper_job.scrapers.apa_scraper
-python -m scraper_job.scrapers.axar_scraper
-
+python -m scraper_job.run_scrapers
 python -m digest_job.run_digest
 ```
+
+6. Start the API:
+
+```bash
+uvicorn web.main:app --reload
+```
+
+Open http://127.0.0.1:8000/digest or http://127.0.0.1:8000/docs.
