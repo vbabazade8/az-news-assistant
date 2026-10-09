@@ -2,9 +2,10 @@ name: Daily digest
 
 on:
   schedule:
-    # 03:13 UTC = 07:13 in Baku. The job takes ~15 minutes, so the digest
-    # is ready by ~07:30 — in time to read it at breakfast or on the way to work.
-    - cron: "13 3 * * *"
+    # 23:13 UTC = 03:13 in Baku. GitHub often starts scheduled runs late
+    # (sometimes by hours), so we start early: even with a delay
+    # the digest is usually ready by the morning.
+    - cron: "13 23 * * *"
   workflow_dispatch:        # adds a "Run workflow" button for manual runs
 
 jobs:
