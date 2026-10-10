@@ -1,0 +1,315 @@
+/* ---------- Colors and fonts ---------- */
+
+:root {
+    --paper: #f4f7f7;     /* cool off-white background */
+    --ink: #15233b;       /* deep navy text */
+    --muted: #5a6577;     /* secondary text */
+    --caspian: #0b6e69;   /* Caspian teal: links and the active choice */
+    --rule: #d3dbde;      /* thin lines */
+    --wash: #e2eeed;      /* light teal background for the current item */
+
+    --serif: "Literata", Georgia, serif;
+    --sans: "Manrope", "Segoe UI", Arial, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--caspian);
+}
+
+a:focus-visible {
+    outline: 2px solid var(--caspian);
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+/* ---------- Top bar: name and language switch ---------- */
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--sans);
+}
+
+.brand {
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+}
+
+.languages {
+    display: flex;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 3px;
+    background: #fff;
+}
+
+.languages a {
+    min-width: 2.75rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.languages a:hover {
+    color: var(--ink);
+}
+
+.languages a[aria-current] {
+    background: var(--ink);
+    color: #fff;
+}
+
+/* ---------- Page layout: the note and the archive ---------- */
+
+.page {
+    display: grid;
+    grid-template-columns: minmax(0, 40rem) 11rem;
+    justify-content: space-between;
+    gap: 3rem;
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ---------- Heading: the date is the main element of the page ---------- */
+
+.tagline {
+    margin: 0 0 0.75rem;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.date {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: clamp(2.6rem, 7vw, 4.75rem);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+}
+
+.weekday {
+    margin: 0.5rem 0 0;
+    color: var(--caspian);
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.weekday::first-letter {
+    text-transform: uppercase;
+}
+
+.empty {
+    margin-top: 2.5rem;
+    padding: 1.25rem 1.5rem;
+    border-left: 3px solid var(--caspian);
+    background: var(--wash);
+}
+
+/* ---------- The digest text (HTML made from Gemini's Markdown) ---------- */
+
+.digest {
+    margin-top: 2.5rem;
+}
+
+/* Gemini uses #, ## or ### for sections; they all look the same here */
+.digest h1,
+.digest h2,
+.digest h3,
+.digest h4 {
+    margin: 2.75rem 0 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid var(--ink);
+    font-family: var(--sans);
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+}
+
+/* Sometimes Gemini starts with a title ("# Daily investment digest") and uses ### for sections.
+   The page already has its own title (the date), so we hide that extra one. */
+.digest:has(h2, h3) > h1 {
+    display: none;
+}
+
+.digest > :first-child,
+.digest > h1:first-child + * {
+    margin-top: 0;
+}
+
+.digest ul,
+.digest ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.digest li {
+    margin: 0 0 1.4rem;
+}
+
+.digest li p {
+    margin: 0;
+}
+
+/* The bold start of each point is its headline: put it on its own line */
+.digest li > strong:first-child,
+.digest li > p:first-child > strong:first-child {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.digest p {
+    margin: 0 0 1rem;
+}
+
+/* Links to the original articles: small and quiet, but easy to click */
+.digest a {
+    font-family: var(--sans);
+    font-size: 0.82em;
+    font-weight: 500;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+.digest a:hover {
+    text-decoration-thickness: 2px;
+}
+
+/* ---------- Archive ---------- */
+
+.archive {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    font-family: var(--sans);
+}
+
+.archive h2 {
+    margin: 0 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.archive ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-left: 1px solid var(--rule);
+}
+
+.archive a {
+    display: block;
+    margin-left: -1px;
+    padding: 0.35rem 0 0.35rem 0.9rem;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.archive a:hover {
+    color: var(--ink);
+}
+
+.archive a[aria-current] {
+    border-left-color: var(--caspian);
+    background: var(--wash);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 3rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 0.875rem;
+}
+
+.footer p {
+    max-width: 40rem;
+    margin: 0;
+}
+
+/* ---------- Phones and small screens ---------- */
+
+@media (max-width: 860px) {
+    .page {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2.5rem;
+        padding: 2rem 1rem 3rem;
+    }
+
+    .topbar,
+    .footer {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    /* On a phone the archive goes under the digest, as a row of dates */
+    .archive {
+        position: static;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--rule);
+    }
+
+    .archive ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        border-left: none;
+    }
+
+    .archive a {
+        margin-left: 0;
+        padding: 0.35rem 0.8rem;
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+        background: #fff;
+    }
+
+    .archive a[aria-current] {
+        border-color: var(--caspian);
+    }
+}

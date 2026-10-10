@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AZ News Digest{% if date_title %} — {{ date_title }}{% endif %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Manrope:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/?language={{ language }}">AZ News Digest</a>
+
+        <nav class="languages" aria-label="Language">
+            {% for lang in languages %}
+                <a href="/?language={{ lang }}{% if digest_date %}&digest_date={{ digest_date }}{% endif %}"
+                   {% if lang == language %}aria-current="true"{% endif %}>{{ lang | upper }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    <div class="page">
+        <main class="note">
+            <p class="tagline">{{ texts.tagline }}</p>
+
+            {% if date_title %}
+                <h1 class="date">
+                    <time datetime="{{ digest_date }}">{{ date_title }}</time>
+                </h1>
+                <p class="weekday">{{ weekday }}</p>
+            {% endif %}
+
+            {% if content_html %}
+                <article class="digest">
+                    {{ content_html | safe }}
+                </article>
+            {% else %}
+                <p class="empty">{{ texts.empty }}</p>
+            {% endif %}
+        </main>
+
+        {% if archive %}
+            <aside class="archive" aria-labelledby="archive-title">
+                <h2 id="archive-title">{{ texts.archive }}</h2>
+                <ol>
+                    {% for day in archive %}
+                        <li>
+                            <a href="/?language={{ language }}&digest_date={{ day.value }}"
+                               {% if day.current %}aria-current="date"{% endif %}>{{ day.label }}</a>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </aside>
+        {% endif %}
+    </div>
+
+    <footer class="footer">
+        <p>{{ texts.footer }}</p>
+    </footer>
+</body>
+</html>
