@@ -1,6 +1,6 @@
 # az-news-assistant
 
-Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is available through an API and will be shown on a website.
+Daily AI news digests for busy executives. Scrapers collect fresh articles from Azerbaijani news sites, store them in a database, and once a day Gemini reads all news from the last 24 hours and writes an industry digest (for example, for investment or banking) in the role of a senior analyst — with a high-level summary and actionable insights. The digest is shown on a website in English, Azerbaijani and Russian.
 
 **Why:** CEOs and analysts don't have time to follow news sites, but they need to know what happened in their industry.
 
@@ -14,14 +14,14 @@ Daily AI news digests for busy executives. Scrapers collect fresh articles from 
 | LLM call logging (prompt + response) | ✅ done |
 | GitHub Actions (automatic daily run) | ✅ done |
 | Digest API (FastAPI) | ✅ done |
-| Website page (Jinja), EN / AZ / RU switch | ⏳ next |
-| Deploy | ⏳ planned |
+| Website (Jinja): EN / AZ / RU switch, archive | ✅ done |
+| Deploy | ⏳ next |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph daily["GitHub Actions — every day at 07:13 Baku time"]
+    subgraph daily["GitHub Actions — every day at 03:13 Baku time"]
         direction LR
         subgraph collect["1. Collect"]
             sites["News sites<br/>report.az · apa.az · axar.az"] -->|HTML pages| scrapers["Scrapers<br/>report · apa · axar"]
@@ -36,17 +36,16 @@ flowchart LR
     db -->|news from the last 24h| job
     job -->|"save digests<br/>+ log the LLM call"| db
 
-    db -->|digests| api["FastAPI<br/>/digest · /dates"]
-    api --> web["Website"]
+    db -->|digests| web["FastAPI<br/>website + API"]
     web --> reader(("CEO / analyst"))
 
     classDef done fill:#d9f5e3,stroke:#16a34a,color:#111
     classDef planned fill:#f3f4f6,stroke:#9ca3af,color:#555,stroke-dasharray:5 5
-    class sites,scrapers,db,job,gemini,api done
-    class web,reader planned
+    class sites,scrapers,db,job,gemini,web done
+    class reader planned
 ```
 
-Green — done, gray — planned.
+Green — done, gray — planned (the website is not deployed yet).
 
 ## News sources
 
@@ -79,7 +78,7 @@ If Gemini is overloaded (503) or rate-limited (429), the job waits 30 seconds an
 
 ## Automatic runs (GitHub Actions)
 
-`.github/workflows/daily-digest.yml` runs every day at 03:13 UTC (07:13 in Baku):
+`.github/workflows/daily-digest.yml` runs every day at 23:13 UTC (03:13 in Baku):
 1. installs dependencies
 2. runs all scrapers (`python -m scraper_job.run_scrapers`)
 3. makes the digest (`python -m digest_job.run_digest`)
@@ -87,11 +86,19 @@ If Gemini is overloaded (503) or rate-limited (429), the job waits 30 seconds an
 
 It can also be started manually with the **Run workflow** button. `DATABASE_URL` and `GEMINI_API_KEY` are stored in the repository secrets.
 
-Note: GitHub can start scheduled runs late (sometimes by hours) when its servers are busy.
+GitHub often starts scheduled runs late (sometimes by hours), so the job starts early: even with a delay, the digest is usually ready by the morning.
+
+## Website
+
+Built with FastAPI and Jinja templates (`web/`).
+
+- `/` — the latest digest
+- `/?language=az` — switch language: `en`, `az` or `ru`
+- `/?language=ru&digest_date=2026-10-07` — a digest from the archive
+
+The digest is stored in Markdown and turned into HTML on the page. Links to the original articles open in a new tab. All texts of the website (in three languages) and the month and weekday names are in `web/texts.py` — to add a language, add it there.
 
 ## API
-
-Built with FastAPI (`web/main.py`).
 
 | Request | Returns |
 |---|---|
@@ -174,7 +181,12 @@ az-news-assistant/
 │   ├── sources.py             # turns news numbers into links to the original articles
 │   └── run_digest.py          # loads news, asks Gemini, saves digests
 ├── web/
-│   └── main.py                # FastAPI: /digest and /dates
+│   ├── main.py                # FastAPI: website page, /digest and /dates
+│   ├── texts.py               # website texts in EN / AZ / RU, month and weekday names
+│   ├── templates/
+│   │   └── index.html         # the page (Jinja template)
+│   └── static/
+│       └── style.css          # the design
 ├── requirements.txt
 └── README.md
 ```
@@ -207,10 +219,10 @@ python -m scraper_job.run_scrapers
 python -m digest_job.run_digest
 ```
 
-6. Start the API:
+6. Start the website:
 
 ```bash
 uvicorn web.main:app --reload
 ```
 
-Open http://127.0.0.1:8000/digest or http://127.0.0.1:8000/docs.
+Open http://127.0.0.1:8000 for the website, or http://127.0.0.1:8000/docs for the API.
